@@ -34,8 +34,10 @@ export function buildFFmpegArgs(
   let videoFilter = ''
 
   if (advanced) {
-    // ponytail: Set standard noise reduction (nr=30) and enable dynamic noise tracking (tn=1) for advanced overrides.
-    audioFilter = `afftdn=nr=30:nf=${advanced.audioNoiseFloor}:nt=${advanced.audioMethod}:tn=1`
+    // nt (noise type) must be specified before numeric params in afftdn or it is silently ignored.
+    // nr scales with the noise floor: lower floor → higher reduction strength.
+    const advNr = Math.min(97, Math.round((-advanced.audioNoiseFloor / 60) * 97))
+    audioFilter = `afftdn=nt=${advanced.audioMethod}:nr=${advNr}:nf=${advanced.audioNoiseFloor}:tn=1`
     if (enableVisual) {
       if (advanced.useNlmeans) {
         videoFilter = `nlmeans=s=${advanced.nlmeansS}:r=${advanced.nlmeansR}:p=${advanced.nlmeansP}`
