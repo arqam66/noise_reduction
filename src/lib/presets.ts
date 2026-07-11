@@ -1,12 +1,13 @@
 import type { Preset } from '../types'
 
+// ponytail: Minimalist and optimized presets enabling noise floor tracking (tn=1) and tuned noise reduction (nr) levels.
 export const PRESETS: Preset[] = [
   {
     id: 'light',
     name: 'Light',
     description: 'Minor hiss, clean environment',
     icon: '🌤',
-    audioFilter: 'afftdn=nf=-20',
+    audioFilter: 'afftdn=nr=15:nf=-30:tn=1',
     videoFilter: 'hqdn3d=1:1:2:2',
     isAudioOnly: false,
   },
@@ -15,7 +16,7 @@ export const PRESETS: Preset[] = [
     name: 'Standard',
     description: 'Typical webcam/mic recording',
     icon: '⚡',
-    audioFilter: 'afftdn=nf=-30',
+    audioFilter: 'afftdn=nr=25:nf=-30:tn=1',
     videoFilter: 'hqdn3d=3:3:6:6',
     isAudioOnly: false,
   },
@@ -24,7 +25,7 @@ export const PRESETS: Preset[] = [
     name: 'Aggressive',
     description: 'Heavy background noise / grain',
     icon: '🔥',
-    audioFilter: 'afftdn=nf=-50',
+    audioFilter: 'afftdn=nr=40:nf=-25:tn=1',
     videoFilter: 'hqdn3d=6:6:10:10',
     isAudioOnly: false,
   },
@@ -33,7 +34,7 @@ export const PRESETS: Preset[] = [
     name: 'Voice-Only',
     description: 'Podcast / voice recording',
     icon: '🎙',
-    audioFilter: 'afftdn=nf=-40:nt=w',
+    audioFilter: 'afftdn=nr=30:nf=-30:tn=1:nt=w',
     videoFilter: '',
     isAudioOnly: true,
   },
@@ -42,7 +43,7 @@ export const PRESETS: Preset[] = [
     name: 'Film Grain',
     description: 'Cinematic / vintage footage',
     icon: '🎬',
-    audioFilter: 'afftdn=nf=-25',
+    audioFilter: 'afftdn=nr=20:nf=-35:tn=1',
     videoFilter: 'nlmeans=s=3:r=7:p=3',
     isAudioOnly: false,
   },
