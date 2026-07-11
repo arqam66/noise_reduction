@@ -145,6 +145,17 @@ export default function App() {
     setProgress({ percent: 0, phase: '', eta: null })
   }, [result, videoFile])
 
+  const handleFaqClick = useCallback((e: React.MouseEvent) => {
+    if (stage !== 'upload') {
+      e.preventDefault()
+      handleReset()
+      setTimeout(() => {
+        const el = document.getElementById('faq')
+        el?.scrollIntoView({ behavior: 'smooth' })
+      }, 100)
+    }
+  }, [stage, handleReset])
+
   // Warn before unload during processing
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
@@ -159,7 +170,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-950">
-      <Header />
+      <Header onFaqClick={handleFaqClick} />
       <main className="flex-1 w-full max-w-5xl mx-auto px-4 py-8">
         {error && (
           <div className="mb-6 p-4 rounded-lg bg-red-900/30 border border-red-700 text-red-200 flex items-start gap-3" role="alert">
@@ -178,7 +189,53 @@ export default function App() {
         )}
 
         {stage === 'upload' && (
-          <UploadZone onFile={handleFile} />
+          <>
+            <UploadZone onFile={handleFile} />
+            
+            <section id="faq" className="mt-16 border-t border-gray-900 pt-12 max-w-3xl mx-auto">
+              <h2 className="text-2xl font-bold text-white mb-8 text-center">Frequently Asked Questions</h2>
+              <div className="space-y-6">
+                <div className="bg-gray-900/20 border border-gray-800/60 p-5 rounded-xl transition-all hover:border-indigo-500/30">
+                  <h3 className="text-lg font-semibold text-indigo-400 mb-2">Are my videos uploaded to a server?</h3>
+                  <p className="text-gray-300 text-sm leading-relaxed">
+                    No. NoiseGone processes everything 100% client-side using WebAssembly (FFmpeg.wasm). 
+                    Your video never leaves your computer, ensuring complete privacy.
+                  </p>
+                </div>
+                
+                <div className="bg-gray-900/20 border border-gray-800/60 p-5 rounded-xl transition-all hover:border-indigo-500/30">
+                  <h3 className="text-lg font-semibold text-indigo-400 mb-2">What is the maximum file size?</h3>
+                  <p className="text-gray-300 text-sm leading-relaxed">
+                    You can process files up to <strong>1 GB</strong>. Because processing happens in your 
+                    browser's memory, actual performance depends on your computer's RAM and CPU power.
+                  </p>
+                </div>
+
+                <div className="bg-gray-900/20 border border-gray-800/60 p-5 rounded-xl transition-all hover:border-indigo-500/30">
+                  <h3 className="text-lg font-semibold text-indigo-400 mb-2">Why is visual noise reduction slower?</h3>
+                  <p className="text-gray-300 text-sm leading-relaxed">
+                    Audio denoising is very fast. However, visual denoising processes individual frames spatially 
+                    and temporally. This frame-by-frame filtering requires significant CPU overhead when run inside a browser sandbox.
+                  </p>
+                </div>
+
+                <div className="bg-gray-900/20 border border-gray-800/60 p-5 rounded-xl transition-all hover:border-indigo-500/30">
+                  <h3 className="text-lg font-semibold text-indigo-400 mb-2">Which formats are supported?</h3>
+                  <p className="text-gray-300 text-sm leading-relaxed">
+                    We support common video formats including <strong>MP4, MOV, MKV, WebM, and AVI</strong>. The output 
+                    file is optimized as an MP4 container (H.264/AAC).
+                  </p>
+                </div>
+
+                <div className="bg-gray-900/20 border border-gray-800/60 p-5 rounded-xl transition-all hover:border-indigo-500/30">
+                  <h3 className="text-lg font-semibold text-indigo-400 mb-2">Who created this tool?</h3>
+                  <p className="text-gray-300 text-sm leading-relaxed">
+                    NoiseGone is an open-source tool developed by <a href="https://github.com/arqam66" target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:text-indigo-300 font-medium transition-colors">@arqam66</a> to provide a fast, secure, and privacy-preserving denoiser for creators and professionals.
+                  </p>
+                </div>
+              </div>
+            </section>
+          </>
         )}
 
         {stage === 'configuring' && videoFile && (
@@ -210,8 +267,19 @@ export default function App() {
         )}
       </main>
 
-      <footer className="text-center py-4 text-gray-500 text-sm border-t border-gray-800">
+      <footer className="text-center py-6 text-gray-500 text-sm border-t border-gray-800 flex flex-col gap-2 items-center bg-gray-950">
         <p>100% client-side · Zero uploads · Your files never leave this device</p>
+        <p className="text-gray-600">
+          Developed by{' '}
+          <a
+            href="https://github.com/arqam66"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-indigo-400 hover:text-indigo-300 transition-colors font-medium"
+          >
+            @arqam66
+          </a>
+        </p>
       </footer>
     </div>
   )

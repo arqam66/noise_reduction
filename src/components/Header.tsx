@@ -1,4 +1,8 @@
-export function Header() {
+interface HeaderProps {
+  onFaqClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void
+}
+
+export function Header({ onFaqClick }: HeaderProps) {
   return (
     <header className="border-b border-gray-800 bg-gray-900/80 backdrop-blur-sm sticky top-0 z-50">
       <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
@@ -17,6 +21,7 @@ export function Header() {
           </span>
           <a
             href="#faq"
+            onClick={onFaqClick}
             className="text-gray-400 hover:text-gray-200 text-sm transition-colors"
           >
             FAQ
@@ -26,3 +31,4 @@ export function Header() {
     </header>
   )
 }
+

@@ -6,6 +6,10 @@
   --color-primary-700: #4338ca;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 :root {
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
 }
