@@ -1,6 +1,7 @@
 import { FFmpeg } from '@ffmpeg/ffmpeg'
 import { toBlobURL, fetchFile } from '@ffmpeg/util'
 import type { Preset, AdvancedSettings, ProcessingProgress } from '../types'
+import { formatTimeRemaining } from './presets'
 
 let ffmpeg: FFmpeg | null = null
 
@@ -37,7 +38,7 @@ export function buildFFmpegArgs(
     // nt (noise type) must be specified before numeric params in afftdn or it is silently ignored.
     // nr scales with the noise floor: lower floor → higher reduction strength.
     const advNr = Math.min(97, Math.round((-advanced.audioNoiseFloor / 60) * 97))
-    audioFilter = `afftdn=nt=${advanced.audioMethod}:nr=${advNr}:nf=${advanced.audioNoiseFloor}:tn=1`
+    audioFilter = `highpass=f=80,afftdn=nt=${advanced.audioMethod}:nr=${advNr}:nf=${advanced.audioNoiseFloor}:tn=1`
     if (enableVisual) {
       if (advanced.useNlmeans) {
         videoFilter = `nlmeans=s=${advanced.nlmeansS}:r=${advanced.nlmeansR}:p=${advanced.nlmeansP}`
@@ -94,21 +95,43 @@ export async function processVideo(
   const args: string[] = [
     '-i', inputName,
     '-filter_complex', filterParts.join(';'),
-    '-map', videoMap,
-    '-map', '[aout]',
-    '-c:v', 'libx264',
-    '-preset', 'fast',
-    '-crf', '23',
+  ]
+
+  if (videoFilter) {
+    args.push(
+      '-map', '[vout]',
+      '-map', '[aout]',
+      '-c:v', 'libx264',
+      '-preset', 'fast',
+      '-crf', '23'
+    )
+  } else {
+    args.push(
+      '-map', '0:v',
+      '-map', '[aout]',
+      '-c:v', 'copy'
+    )
+  }
+
+  args.push(
     '-c:a', 'aac',
     '-b:a', '192k',
     '-movflags', '+faststart',
     '-y',
-    outputName,
-  ]
+    outputName
+  )
+
+  const processingStartTime = performance.now()
 
   ff.on('progress', ({ progress, time }) => {
     const percent = Math.min(95, 15 + progress * 80)
-    const eta = time > 0 ? estimateRemaining(progress, time) : null
+    let eta: string | null = null
+    if (progress > 0 && progress < 1) {
+      const elapsedMs = performance.now() - processingStartTime
+      const totalEstimatedMs = elapsedMs / progress
+      const remainingMs = totalEstimatedMs - elapsedMs
+      eta = formatTimeRemaining(remainingMs)
+    }
     onProgress({
       percent,
       phase: 'Denoising video...',

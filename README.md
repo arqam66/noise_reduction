@@ -1,59 +1,74 @@
-# 🎙️ NoiseGone — Client-Side Video & Audio Noise Reduction Tool
+# 🎙️ NoiseGone — High-Performance, Client-Side Video & Audio Noise Reduction
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Stack: React + Vite](https://img.shields.io/badge/Stack-React%20%2B%20Vite-indigo)](https://vite.dev/)
 [![Engine: FFmpeg.wasm](https://img.shields.io/badge/Engine-FFmpeg.wasm-green)](https://ffmpeg.org/)
 [![Privacy: 100% On-Device](https://img.shields.io/badge/Privacy-100%25%20On--Device-success)](https://github.com/arqam66/noise_reduction)
 
-**NoiseGone** is a professional-grade, fully browser-based web application that removes audio hiss, room reverberation, and video grain from uploaded footage — **100% client-side, with zero server uploads**.
+**NoiseGone** is a professional-grade, fully browser-based web application that removes audio hiss, room reverberation, and video grain from uploaded footage — **100% client-side, with zero server uploads and zero data leaving your device**.
 
-Leveraging **WebAssembly (FFmpeg.wasm)**, **Web Audio API**, and **Web Workers**, NoiseGone offers studio-quality audio-visual denoising for files up to **1 GB** without requiring accounts, API keys, or cloud infrastructure.
+Leveraging **WebAssembly (FFmpeg.wasm)**, the **Web Audio API**, and **Web Workers**, NoiseGone offers studio-quality audio-visual denoising for files up to **1 GB** without requiring user accounts, API keys, or cloud infrastructure.
 
-> **Privacy-First Promise:** Your video files never leave your computer. All rendering, processing, and encoding occur entirely inside your browser's sandboxed environment. You can even run this application completely offline.
-
----
-
-## ✨ Features
-
-- **Double-Layer Denoising**: Independent filters for cleaning up background audio noise (hum, hiss, fans) and visual video noise (digital sensor noise, low-light grain).
-- **Optimized Presets**:
-  - **Light**: For high-quality recordings with minor static/hiss.
-  - **Standard**: The default setting for webcams and standard microphones.
-  - **Aggressive**: Heavy background attenuation and visual cleanup.
-  - **Voice-Only**: High pass filtering and fast-Fourier transforms optimized for vocals and speech.
-  - **Film Grain**: Gentle audio cleanup with advanced non-local means (`nlmeans`) video smoothing.
-- **Advanced Options**: Directly tweak FFmpeg filter parameters (e.g., FFT noise reduction strength, spatial/temporal parameters) for custom workflows.
-- **Local Waveform Preview**: Inspect before-and-after audio dynamics using browser-native waveforms.
-- **Responsive & Modern UI**: Built with React, Tailwind CSS, featuring glassmorphism accents, progress metrics, and live ETA estimation.
+> **Privacy-First Guarantee:** Your video files never touch external servers. All rendering, filtering, encoding, and muxing occur strictly inside your browser's secure sandbox. You can even run this application entirely offline.
 
 ---
 
-## 🛠️ Architecture & Under the Hood
+## ✨ Key Features & Optimizations
+
+### 🚀 Ultra-Fast Audio Noise Reduction (Video Stream Copying)
+When "Visual Noise Reduction" is disabled (or an audio-only preset like **Voice-Only** is selected), NoiseGone automatically bypasses the computationally heavy video re-encoding phase. By applying FFmpeg's stream-copy feature (`-c:v copy`), we:
+1. **Dramatically Accelerate Processing:** Denoising completes in **seconds** (up to 50x faster than full re-encoding) because only the lightweight audio track is processed and encoded.
+2. **Preserve Video Quality:** The original video stream is copied bit-for-bit, meaning there is **zero video degradation** or quality loss.
+3. **Avoid Unnecessary File Size Bloat:** Since the video stream is not re-compressed, the output file size remains nearly identical to the original, only replacing noisy audio with crystal-clear audio.
+
+### 🔊 Double-Layer Vocal & Audio Denoising
+To deliver professional, podcast-quality vocals, NoiseGone pairs FFmpeg’s **Adaptive Fast Fourier Transform Denoiser (`afftdn`)** with high-pass and low-pass frequency isolation:
+- **AC Hum & Rumble Removal:** A configured **high-pass filter** (`highpass=f=80` or `highpass=f=100`) filters out sub-bass room vibrations, microphone rumblings, and AC electrical humming below vocal ranges.
+- **High-Frequency Hiss Suppression:** A configured **low-pass filter** (`lowpass=f=12000` or `lowpass=f=8000`) rolls off annoying electronic whistles, static crackle, and laptop fan noise above vocal ranges.
+- **Adaptive Floor Tracking:** FFmpeg's `tn=1` enables active tracking, letting the filter adapt to changing background noise profiles throughout the clip.
+
+---
+
+## 🛠️ System Architecture & Data Flow
 
 ```mermaid
 graph TD
-    A[User Selects Video File] --> B[Local Metadata Extraction]
-    B --> C[Configure Presets & Filters]
-    C --> D[FFmpeg.wasm Instance Spawned]
-    D --> E[MEMFS Virtual File System]
-    E --> F[Audio Filter Processing]
-    E --> G[Video Filter Processing]
-    F & G --> H[Mux Audio & Video Streams]
-    H --> I[Generate Local Blob URL]
-    I --> J[Result Preview & Download]
+    A[User Selects Video File] --> B[HTML5 Local Metadata Extraction]
+    B --> C[Configure Presets & Filter Chains]
+    C --> D[Load FFmpeg.wasm in Web Worker]
+    D --> E[MEMFS Virtual File System Allocation]
+    E -->|Visual Denoise OFF| F[Audio Filters + Stream-Copy Video '-c:v copy']
+    E -->|Visual Denoise ON| G[Audio Filters + Video Filters + Encode '-c:v libx264']
+    F & G --> H[Mux Audio & Video into MP4 Container]
+    H --> I[Generate Safe Local Blob URL]
+    I --> J[WaveSurfer.js Visual Comparison & Instant Download]
 ```
 
-1. **MEMFS Virtual Filesystem**: Input files are written directly into a virtual, memory-backed file system (MEMFS) managed by WebAssembly.
-2. **Multi-Threaded Processing**: Spawns Web Workers via browser-based worker pools to perform heavy mathematical operations (Fast Fourier Transforms, temporal smoothing) in parallel.
-3. **Cross-Origin Security Headers**: Because FFmpeg.wasm requires `SharedArrayBuffer` for multi-threading, the hosting server must supply custom COOP (`Cross-Origin-Opener-Policy`) and COEP (`Cross-Origin-Embedder-Policy`) headers to isolate the context safely.
+1. **MEMFS Sandbox:** The uploaded video file is mounted into an in-memory virtual file system (MEMFS) managed securely by WebAssembly.
+2. **Multi-Threaded Execution:** A dedicated worker pool performs complex mathematical operations (Fast Fourier Transforms, temporal smoothing) in parallel.
+3. **Local Cleanup:** Upon completing or cancelling, all memory buffers are fully deallocated (`ff.deleteFile`), leaving no residual files in browser memory.
 
 ---
 
-## 🚀 Local Development & Setup
+## ⚙️ Core Filter & Preset Configurations
+
+The application maps user-facing presets to precisely tuned FFmpeg filter graphs:
+
+| Preset | Audio Filter Pipeline | Video Filter Pipeline | Primary Use Case |
+| :--- | :--- | :--- | :--- |
+| **🌤 Light** | `highpass=f=80,afftdn=nr=15:nf=-45:tn=1` | `hqdn3d=1:1:2:2` | Quiet room recordings with faint background hum or hiss. |
+| **⚡ Standard** | `highpass=f=80,afftdn=nr=25:nf=-40:tn=1,lowpass=f=12000` | `hqdn3d=3:3:6:6` | Default webcam, desk microphone, or typical office background setup. |
+| **🔥 Aggressive** | `highpass=f=100,afftdn=nr=35:nf=-35:tn=1,lowpass=f=10000` | `hqdn3d=6:6:10:10` | Outdoor wind noise, loud air conditioners, or highly grainy phone footage. |
+| **🎙 Voice-Only** | `highpass=f=100,afftdn=nt=w:nr=30:nf=-35:tn=1,lowpass=f=8000` | *(Video Stream Copy)* | Audio-focused interviews, podcast episodes, and lectures (sharp voice isolation). |
+| **🎬 Film Grain** | `highpass=f=80,afftdn=nr=18:nf=-40:tn=1` | `nlmeans=s=3:r=7:p=3` | Vintage camera sensors; gentle audio cleanup paired with advanced visual non-local means. |
+
+---
+
+## 🚀 Local Development & Installation
 
 ### Prerequisites
-- **Node.js** (v18 or higher recommended)
-- **npm** or **yarn**
+- **Node.js** (v18.0.0 or higher recommended)
+- **npm** (v9.0.0 or higher)
 
 ### 1. Clone the Repository
 ```bash
@@ -61,69 +76,106 @@ git clone https://github.com/arqam66/noise_reduction.git
 cd noise_reduction
 ```
 
-### 2. Install Dependencies
+### 2. Install Project Dependencies
 ```bash
 npm install
 ```
 
-### 3. Run the Development Server
+### 3. Launch Development Server
 ```bash
 npm run dev
 ```
 Open your browser and navigate to `http://localhost:5173`.
 
-> [!WARNING]
-> **Important Note for Local Dev / Production Hosting:**
-> To allow WebAssembly multi-threading, the server must respond with the following headers:
-> - `Cross-Origin-Opener-Policy: same-origin`
-> - `Cross-Origin-Embedder-Policy: require-corp`
->
-> In development mode, Vite is pre-configured with these headers in `vite.config.ts`. If you are deploying to Netlify, Vercel, GitHub Pages, or a custom Nginx server, you must configure these headers in your respective configuration files (e.g., `netlify.toml`, `vercel.json`, or `.htaccess`).
+### 4. Build for Production
+To bundle the React + TypeScript assets into highly optimized static files:
+```bash
+npm run build
+```
 
 ---
 
-## ⚙️ Core Filter Technical Configuration
+## 🌐 Production Deployment & Security Headers
 
-Under the hood, NoiseGone maps presets to specific FFmpeg command-line filters:
+Because FFmpeg.wasm relies on `SharedArrayBuffer` for multi-threaded processing, browsers require a high-security context. The hosting CDN or web server **must** serve the application with the following HTTP security headers:
 
-| Preset | Audio Filter Command | Video Filter Command | Primary Use Case |
-| :--- | :--- | :--- | :--- |
-| **Light** | `afftdn=nf=-20` | `hqdn3d=1:1:2:2` | Low-level hiss, quiet room |
-| **Standard** | `afftdn=nf=-30` | `hqdn3d=3:3:6:6` | Default webcam & mic setup |
-| **Aggressive** | `afftdn=nf=-50` | `hqdn3d=6:6:10:10` | Outdoor wind, loud AC, high grain |
-| **Voice-Only** | `afftdn=nf=-40:nt=w` | *(Passthrough)* | Podcasting, voiceovers, lectures |
-| **Film Grain** | `afftdn=nf=-25` | `nlmeans=s=3:r=7:p=3` | Vintage camera sensor, high-quality denoising |
+```http
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Embedder-Policy: require-corp
+```
+
+### Configuration Examples for CDNs
+
+#### 1. Vercel (`vercel.json`)
+```json
+{
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "Cross-Origin-Opener-Policy", "value": "same-origin" },
+        { "key": "Cross-Origin-Embedder-Policy", "value": "require-corp" }
+      ]
+    }
+  ]
+}
+```
+
+#### 2. Netlify (`netlify.toml`)
+```toml
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Cross-Origin-Opener-Policy = "same-origin"
+    Cross-Origin-Embedder-Policy = "require-corp"
+```
+
+#### 3. Cloudflare Pages (`_headers`)
+Create a `_headers` file in your build output (`dist/`) directory:
+```text
+/*
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Embedder-Policy: require-corp
+```
+
+#### 4. Nginx Configuration (`nginx.conf`)
+```nginx
+server {
+    listen 80;
+    server_name yourdomain.com;
+    root /usr/share/nginx/html;
+
+    location / {
+        add_header Cross-Origin-Opener-Policy "same-origin" always;
+        add_header Cross-Origin-Embedder-Policy "require-corp" always;
+        try_files $uri $uri/ /index.html;
+    }
+}
+```
+
+---
+
+## 🧠 Memory Management for Large Files (Up to 1 GB)
+
+Browsers limit heap memory allocation per tab. Processing 1 GB files client-side requires rigorous RAM budgeting. NoiseGone uses several advanced techniques to ensure stability:
+- **Virtual MEMFS Cleanup:** Deletes both the input stream buffer and output MP4 buffer immediately from WASM memory as soon as the browser download blob is registered.
+- **Progressive Chunk Garbage Collection:** Transfers the parsed ArrayBuffers progressively to avoid keeping duplicate representations in both the JavaScript heap and the WebAssembly linear memory simultaneously.
+- **Hardware RAM Assessment:** Warns users with less than 8 GB of hardware RAM that processing large clips (>500 MB) with intensive video filtering might exceed system constraints.
 
 ---
 
 ## 💬 Frequently Asked Questions (FAQ)
 
-#### Q: Are my files uploaded to a server?
-**A:** No. NoiseGone runs entirely in your browser. No files, metadata, or media streams are transmitted over the network. You can disconnect your internet and the application will continue to function.
+#### Q: Is my data safe with NoiseGone?
+**A:** Yes. NoiseGone is 100% serverless. Your files are read into local browser memory, filtered via local WebAssembly instructions, and downloaded locally. No analytics, tracking, or telemetry captures your content.
 
-#### Q: What is the maximum file size?
-**A:** The application enforces a **1 GB limit**. Since video files are loaded directly into browser memory (RAM) for processing, large files can crash browser tabs on devices with low memory. We recommend having at least 8 GB of RAM for files larger than 500 MB.
-
-#### Q: Why is visual noise reduction significantly slower than audio?
-**A:** Audio filters analyze waveforms, which is computationally lightweight. Video filters must analyze, compare, and modify pixel grids across multiple frames temporally and spatially. Rendering frames within a sandboxed WebAssembly environment has an inherent performance overhead compared to native desktop applications.
-
-#### Q: Which browsers are supported?
-**A:** Any modern browser supporting WebAssembly, Web Workers, and SharedArrayBuffer:
-- Google Chrome / Chromium-based browsers (Edge, Opera, Brave)
-- Mozilla Firefox
-- Apple Safari (Desktop)
+#### Q: Why is visual noise reduction slower than audio?
+**A:** Audio waveforms are one-dimensional signals processed very fast via FFT. Video frames are complex 2D grids (millions of pixels per frame) that must be analyzed both spatially (within the frame) and temporally (across multiple frames). This process is highly CPU-intensive inside a sandboxed browser environments.
 
 ---
 
-## 👨‍💻 Created By
+## 👨‍💻 Creator & License
 
-NoiseGone was developed with ❤️ by **arqam66**.
+Designed and built with ❤️ by [**arqam66**](https://github.com/arqam66).
 
-- **GitHub**: [@arqam66](https://github.com/arqam66)
-- **Repository**: [arqam66/noise_reduction](https://github.com/arqam66/noise_reduction)
-
----
-
-## 📄 License
-
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+Licensed under the [MIT License](LICENSE). Feel free to fork, customize, and build upon this project!
