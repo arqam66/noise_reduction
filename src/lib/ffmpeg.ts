@@ -61,7 +61,8 @@ export async function processVideo(
   preset: Preset,
   enableVisual: boolean,
   advanced: AdvancedSettings | null,
-  onProgress: (progress: ProcessingProgress) => void
+  onProgress: (progress: ProcessingProgress) => void,
+  signal?: AbortSignal
 ): Promise<{ outputBlob: Blob; fileName: string }> {
   const ff = await loadFFmpeg()
 
@@ -71,13 +72,19 @@ export async function processVideo(
   onProgress({ percent: 5, phase: 'Loading file into memory...', eta: null })
 
   const fileData = await fetchFile(file)
+  if (signal?.aborted) {
+    try { await ff.deleteFile(inputName) } catch { /* ignore */ }
+    throw new Error('CANCELLED')
+  }
   await ff.writeFile(inputName, fileData)
+  if (signal?.aborted) {
+    try { await ff.deleteFile(inputName) } catch { /* ignore */ }
+    throw new Error('CANCELLED')
+  }
 
   const { audioFilter, videoFilter } = buildFFmpegArgs(preset, enableVisual, advanced)
 
   onProgress({ percent: 15, phase: 'Applying noise reduction...', eta: null })
-
-  const filterComplex: string[] = []
 
   // Build the filter chain
   const filterParts: string[] = []
@@ -123,7 +130,7 @@ export async function processVideo(
 
   const processingStartTime = performance.now()
 
-  ff.on('progress', ({ progress, time }) => {
+  const progressHandler = ({ progress }: { progress: number; time: number }) => {
     const percent = Math.min(95, 15 + progress * 80)
     let eta: string | null = null
     if (progress > 0 && progress < 1) {
@@ -137,13 +144,25 @@ export async function processVideo(
       phase: 'Denoising video...',
       eta,
     })
-  })
+  }
+
+  ff.on('progress', progressHandler)
 
   try {
-    await ff.exec(args)
+    if (signal?.aborted) throw new Error('CANCELLED')
+    await ff.exec(args, undefined, signal ? { signal } : undefined)
   } catch (err) {
+    ff.off('progress', progressHandler)
+    // Best-effort cleanup of virtual files on failure/cancellation.
+    try { await ff.deleteFile(inputName) } catch { /* ignore */ }
+    try { await ff.deleteFile(outputName) } catch { /* ignore */ }
+    if (signal?.aborted) {
+      throw new Error('CANCELLED')
+    }
     throw new Error('Processing failed. The file may be corrupted or use an unsupported codec.')
   }
+
+  ff.off('progress', progressHandler)
 
   onProgress({ percent: 96, phase: 'Preparing download...', eta: null })
 
@@ -169,5 +188,3 @@ function getExtension(name: string): string {
   const idx = name.lastIndexOf('.')
   return idx >= 0 ? name.slice(idx) : '.mp4'
 }
-
-

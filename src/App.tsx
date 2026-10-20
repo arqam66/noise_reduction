@@ -17,9 +17,9 @@ export default function App() {
   const [progress, setProgress] = useState<ProcessingProgress>({ percent: 0, phase: '', eta: null })
   const [result, setResult] = useState<ProcessingResult | null>(null)
   const [error, setError] = useState<string | null>(null)
-  // Abort flag lives in a ref so an in-flight processVideo call observes a
-  // cancel immediately instead of reading a stale state closure.
-  const processingAbortedRef = useRef(false)
+  // Abort controller lives in a ref so an in-flight processVideo call can be
+  // cancelled immediately (FFmpeg.wasm supports AbortSignal on exec).
+  const abortControllerRef = useRef<AbortController | null>(null)
 
   const handleFile = useCallback(async (file: File) => {
     setError(null)
@@ -67,11 +67,7 @@ export default function App() {
         vid.src = url
       })
 
-      // Get thumbnail
-      if (video.duration !== null && video.duration > 0) {
-        const thumbUrl = URL.createObjectURL(file)
-        video.thumbnailUrl = thumbUrl
-      }
+      // Thumbnail preview is derived on-demand in ResultView; no persistent URL needed.
     } catch {
       // Metadata extraction is best-effort
     }
@@ -83,7 +79,8 @@ export default function App() {
   const handleProcess = useCallback(async () => {
     if (!videoFile) return
 
-    processingAbortedRef.current = false
+    const controller = new AbortController()
+    abortControllerRef.current = controller
     setStage('processing')
     setProgress({ percent: 0, phase: 'Starting...', eta: null })
 
@@ -97,13 +94,14 @@ export default function App() {
         enableVisual,
         advancedSettings,
         (p) => {
-          if (!processingAbortedRef.current) {
+          if (!controller.signal.aborted) {
             setProgress(p)
           }
-        }
+        },
+        controller.signal
       )
 
-      if (processingAbortedRef.current) {
+      if (controller.signal.aborted) {
         setStage('configuring')
         return
       }
@@ -122,14 +120,20 @@ export default function App() {
       })
       setStage('result')
     } catch (err) {
+      if (err instanceof Error && err.message === 'CANCELLED') {
+        setStage('configuring')
+        return
+      }
       const message = err instanceof Error ? err.message : 'Something went wrong during processing. Please try again.'
       setError(message)
       setStage('configuring')
+    } finally {
+      abortControllerRef.current = null
     }
   }, [videoFile, selectedPreset, enableVisual, advancedSettings])
 
   const handleCancel = useCallback(() => {
-    processingAbortedRef.current = true
+    abortControllerRef.current?.abort()
     setStage('configuring')
     setProgress({ percent: 0, phase: '', eta: null })
   }, [])

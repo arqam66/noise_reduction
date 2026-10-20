@@ -56,7 +56,7 @@ export function ResultView({ result, onReset }: ResultViewProps) {
     processedWsRef.current = processedWs
 
     if (result.blobUrl) {
-      processedWs.load(result.blobUrl)
+      processedWs.load(result.blobUrl).catch(() => {})
     }
     if (result.originalBlobUrl) {
       // Best-effort: the original container may not be decodable by Web Audio.
@@ -64,8 +64,8 @@ export function ResultView({ result, onReset }: ResultViewProps) {
     }
 
     return () => {
-      originalWs.destroy()
-      processedWs.destroy()
+      try { originalWs.destroy() } catch { /* ignore AbortError during StrictMode double-invoke */ }
+      try { processedWs.destroy() } catch { /* ignore AbortError during StrictMode double-invoke */ }
     }
   }, [result.blobUrl, result.originalBlobUrl])
 
