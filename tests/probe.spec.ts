@@ -18,10 +18,10 @@ test('ffmpeg core loads and executes', async ({ page }) => {
       const ff = await loadFFmpeg()
       out.loaded = true
       out.hasExec = typeof ff.exec === 'function'
-      out.hasFfprobe = typeof (ff as unknown as { ffprobe?: unknown }).ffprobe === 'function'
-      // exec()/ffprobe() resolve to 0 on success, non-zero on error.
+      // @ffmpeg/ffmpeg exposes `exec` (ffmpeg). There is no separate `ffprobe`
+      // helper in this version; probing is done via `ffmpeg -i`.
+      // exec() resolves to 0 on success, non-zero on error.
       out.versionRet = await ff.exec(['-version'])
-      out.ffprobeRet = await ff.ffprobe(['-version'])
     } catch (e) {
       out.error = String(e)
     }
@@ -32,7 +32,5 @@ test('ffmpeg core loads and executes', async ({ page }) => {
 
   expect(result.loaded).toBe(true)
   expect(result.hasExec).toBe(true)
-  expect(result.hasFfprobe).toBe(true)
   expect(result.versionRet).toBe(0)
-  expect(result.ffprobeRet).toBe(0)
 })
