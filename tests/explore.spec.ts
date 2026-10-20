@@ -1,9 +1,14 @@
 import { test, expect } from '@playwright/test'
+import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const FIXTURE = path.resolve(__dirname, '../_qa/noisy.mp4')
+
+// The clip is a local, gitignored QA fixture. Keep the suite green on fresh
+// clones instead of failing on a missing input file.
+test.skip(!fs.existsSync(FIXTURE), 'Local _qa/noisy.mp4 fixture is not available')
 
 test('full flow exploration', async ({ page }) => {
   const consoleLogs: string[] = []
@@ -33,7 +38,7 @@ test('full flow exploration', async ({ page }) => {
 
   // --- preset interactions ---
   await page.getByRole('button', { name: /Voice-Only/ }).click()
-  const visualToggle = page.locator('#visual-toggle')
+  const visualToggle = page.getByTestId('visual-toggle')
   console.log('voice-only visual disabled =', await visualToggle.isDisabled())
   console.log('voice-only visual aria-checked =', await visualToggle.getAttribute('aria-checked'))
 

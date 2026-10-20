@@ -1,5 +1,7 @@
 export type AppStage = 'upload' | 'configuring' | 'processing' | 'result'
 
+export type MediaKind = 'video' | 'audio'
+
 export type PresetId = 'light' | 'standard' | 'aggressive' | 'voice-only' | 'film-grain'
 
 export interface Preset {
@@ -12,13 +14,13 @@ export interface Preset {
   isAudioOnly: boolean
 }
 
-export interface VideoFile {
+export interface MediaFile {
   file: File
   name: string
   size: number
+  kind: MediaKind
   duration: number | null
   resolution: string | null
-  codec: string | null
   thumbnailUrl: string | null
 }
 
@@ -29,6 +31,7 @@ export interface ProcessingProgress {
 }
 
 export interface ProcessingResult {
+  mediaKind: MediaKind
   originalSize: number
   processedSize: number
   blobUrl: string

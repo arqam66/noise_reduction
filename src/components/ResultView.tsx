@@ -17,9 +17,16 @@ export function ResultView({ result, onReset }: ResultViewProps) {
   const [playingProcessed, setPlayingProcessed] = useState(false)
   const [originalLoaded, setOriginalLoaded] = useState(false)
   const [processedLoaded, setProcessedLoaded] = useState(false)
+  const [originalError, setOriginalError] = useState(false)
+  const [processedError, setProcessedError] = useState(false)
 
   useEffect(() => {
     if (!originalContainerRef.current || !processedContainerRef.current) return
+
+    setOriginalLoaded(false)
+    setProcessedLoaded(false)
+    setOriginalError(false)
+    setProcessedError(false)
 
     const originalWs = WaveSurfer.create({
       container: originalContainerRef.current,
@@ -44,24 +51,28 @@ export function ResultView({ result, onReset }: ResultViewProps) {
     originalWs.on('ready', () => setOriginalLoaded(true))
     processedWs.on('ready', () => setProcessedLoaded(true))
 
-    originalWs.on('play', () => setPlayingOriginal(true))
+    originalWs.on('play', () => {
+      setPlayingOriginal(true)
+      // Only one preview should play at a time.
+      if (processedWs.isPlaying()) processedWs.pause()
+    })
     originalWs.on('pause', () => setPlayingOriginal(false))
     originalWs.on('finish', () => setPlayingOriginal(false))
 
-    processedWs.on('play', () => setPlayingProcessed(true))
+    processedWs.on('play', () => {
+      setPlayingProcessed(true)
+      if (originalWs.isPlaying()) originalWs.pause()
+    })
     processedWs.on('pause', () => setPlayingProcessed(false))
     processedWs.on('finish', () => setPlayingProcessed(false))
 
     originalWsRef.current = originalWs
     processedWsRef.current = processedWs
 
-    if (result.blobUrl) {
-      processedWs.load(result.blobUrl).catch(() => {})
-    }
-    if (result.originalBlobUrl) {
-      // Best-effort: the original container may not be decodable by Web Audio.
-      originalWs.load(result.originalBlobUrl).catch(() => {})
-    }
+    processedWs.load(result.blobUrl).catch(() => setProcessedError(true))
+    // The original container may hold a codec Web Audio cannot decode (e.g.
+    // MKV/AVI); surface that instead of showing a permanent loading message.
+    originalWs.load(result.originalBlobUrl).catch(() => setOriginalError(true))
 
     return () => {
       try { originalWs.destroy() } catch { /* ignore AbortError during StrictMode double-invoke */ }
@@ -70,10 +81,12 @@ export function ResultView({ result, onReset }: ResultViewProps) {
   }, [result.blobUrl, result.originalBlobUrl])
 
   const toggleOriginal = () => {
+    if (!originalLoaded || originalError) return
     originalWsRef.current?.playPause()
   }
 
   const toggleProcessed = () => {
+    if (!processedLoaded || processedError) return
     processedWsRef.current?.playPause()
   }
 
@@ -87,19 +100,46 @@ export function ResultView({ result, onReset }: ResultViewProps) {
   }
 
   const sizeDiff = result.originalSize - result.processedSize
-  const sizePercent = ((sizeDiff / result.originalSize) * 100).toFixed(1)
+  const sizePercent =
+    result.originalSize > 0
+      ? ((sizeDiff / result.originalSize) * 100).toFixed(1)
+      : '0.0'
   const processingSeconds = (result.processingTimeMs / 1000).toFixed(1)
+  const isAudio = result.mediaKind === 'audio'
+
+  const previewMessage = (
+    loaded: boolean,
+    error: boolean,
+    fallback: string
+  ): string | null => {
+    if (error) return 'Preview unavailable for this format. Download the file to listen.'
+    if (!loaded) return fallback
+    return null
+  }
+
+  const originalMessage = previewMessage(
+    originalLoaded,
+    originalError,
+    'Loading original preview…'
+  )
+  const processedMessage = previewMessage(
+    processedLoaded,
+    processedError,
+    'Loading denoised preview…'
+  )
 
   return (
     <div className="space-y-6">
       {/* Success banner */}
       <div className="bg-green-50 border border-green-200 rounded-xl p-6 text-center">
         <div className="w-14 h-14 mx-auto rounded-full bg-green-100 flex items-center justify-center mb-3">
-          <svg className="w-8 h-8 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+          <svg className="w-8 h-8 text-green-600" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
           </svg>
         </div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-1">Video cleaned successfully!</h2>
+        <h2 className="text-2xl font-bold text-gray-900 mb-1">
+          {isAudio ? 'Audio cleaned successfully!' : 'Video cleaned successfully!'}
+        </h2>
         <p className="text-gray-500 text-sm">
           Processed in {processingSeconds}s
         </p>
@@ -114,24 +154,26 @@ export function ResultView({ result, onReset }: ResultViewProps) {
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs text-gray-400 uppercase tracking-wider">Original</span>
             <button
+              type="button"
               onClick={toggleOriginal}
-              className="p-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 transition-colors"
+              disabled={!originalLoaded || originalError}
+              className="p-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               aria-label={playingOriginal ? 'Pause original' : 'Play original'}
             >
               {playingOriginal ? (
-                <svg className="w-4 h-4 text-gray-700" fill="currentColor" viewBox="0 0 20 20">
+                <svg className="w-4 h-4 text-gray-700" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
                   <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
                 </svg>
               ) : (
-                <svg className="w-4 h-4 text-gray-700" fill="currentColor" viewBox="0 0 20 20">
+                <svg className="w-4 h-4 text-gray-700" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
                 </svg>
               )}
             </button>
           </div>
           <div ref={originalContainerRef} className="bg-gray-50 rounded-lg p-2 border border-gray-100" />
-          {!originalLoaded && (
-            <p className="text-xs text-gray-400 mt-1 text-center">Load the original file to preview</p>
+          {originalMessage && (
+            <p className="text-xs text-gray-400 mt-1 text-center">{originalMessage}</p>
           )}
         </div>
 
@@ -140,22 +182,27 @@ export function ResultView({ result, onReset }: ResultViewProps) {
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs text-green-600 uppercase tracking-wider">Denoised</span>
             <button
+              type="button"
               onClick={toggleProcessed}
-              className="p-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 transition-colors"
+              disabled={!processedLoaded || processedError}
+              className="p-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               aria-label={playingProcessed ? 'Pause denoised' : 'Play denoised'}
             >
               {playingProcessed ? (
-                <svg className="w-4 h-4 text-gray-700" fill="currentColor" viewBox="0 0 20 20">
+                <svg className="w-4 h-4 text-gray-700" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
                   <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
                 </svg>
               ) : (
-                <svg className="w-4 h-4 text-gray-700" fill="currentColor" viewBox="0 0 20 20">
+                <svg className="w-4 h-4 text-gray-700" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
                 </svg>
               )}
             </button>
           </div>
           <div ref={processedContainerRef} className="bg-gray-50 rounded-lg p-2 border border-gray-100" />
+          {processedMessage && (
+            <p className="text-xs text-gray-400 mt-1 text-center">{processedMessage}</p>
+          )}
         </div>
       </div>
 
@@ -180,15 +227,17 @@ export function ResultView({ result, onReset }: ResultViewProps) {
       {/* Actions */}
       <div className="flex flex-col sm:flex-row gap-3">
         <button
+          type="button"
           onClick={handleDownload}
           className="flex-1 py-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-lg transition-colors duration-150 shadow-md shadow-indigo-200 flex items-center justify-center gap-2"
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
           </svg>
-          Download Cleaned Video
+          Download Cleaned {isAudio ? 'Audio' : 'Video'}
         </button>
         <button
+          type="button"
           onClick={onReset}
           className="py-4 px-8 rounded-xl border border-gray-300 text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors font-medium"
         >

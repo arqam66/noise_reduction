@@ -17,6 +17,9 @@ test-results
 _qa
 coverage
 
+# Local Task Master MCP state
+.taskmaster
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

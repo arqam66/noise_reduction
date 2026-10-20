@@ -1,17 +1,21 @@
-import type { ProcessingProgress } from '../types'
+import type { MediaKind, ProcessingProgress } from '../types'
 
 interface ProcessingViewProps {
   progress: ProcessingProgress
+  mediaKind: MediaKind
   onCancel: () => void
 }
 
-export function ProcessingView({ progress, onCancel }: ProcessingViewProps) {
+export function ProcessingView({ progress, mediaKind, onCancel }: ProcessingViewProps) {
+  const label = mediaKind === 'audio' ? 'audio' : 'video'
+  const roundedPercent = Math.round(progress.percent)
+
   return (
-    <div className="flex flex-col items-center justify-center py-16 gap-8">
+    <div className="flex flex-col items-center justify-center py-16 gap-8" aria-busy="true">
       <div className="w-full max-w-md text-center space-y-6">
         {/* Animated icon */}
         <div className="w-20 h-20 mx-auto rounded-full bg-indigo-100 flex items-center justify-center animate-pulse-progress">
-          <svg className="w-10 h-10 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-10 h-10 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -22,22 +26,30 @@ export function ProcessingView({ progress, onCancel }: ProcessingViewProps) {
         </div>
 
         <div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Processing your video</h2>
-          <p className="text-gray-500 text-sm">{progress.phase}</p>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Processing your {label}</h2>
+          <p className="text-gray-500 text-sm" aria-live="polite">{progress.phase}</p>
         </div>
 
         {/* Progress bar */}
-        <div className="w-full" role="progressbar" aria-valuenow={progress.percent} aria-valuemin={0} aria-valuemax={100}>
+        <div
+          className="w-full"
+          role="progressbar"
+          aria-label={`${label} processing progress`}
+          aria-valuenow={roundedPercent}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuetext={`${roundedPercent}% — ${progress.phase}`}
+        >
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-gray-600">{Math.round(progress.percent)}%</span>
+            <span className="text-sm text-gray-600">{roundedPercent}%</span>
             {progress.eta && (
               <span className="text-sm text-gray-400">{progress.eta}</span>
             )}
           </div>
           <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
             <div
-              className="h-full bg-gradient-to-r from-indigo-600 to-indigo-400 rounded-full transition-all duration-300 ease-out"
-              style={{ width: `${progress.percent}%` }}
+              className="h-full bg-gradient-to-r from-indigo-600 to-indigo-400 rounded-full transition-all duration-300 ease-out motion-reduce:transition-none"
+              style={{ width: `${Math.max(0, Math.min(100, progress.percent))}%` }}
             />
           </div>
         </div>
@@ -52,6 +64,7 @@ export function ProcessingView({ progress, onCancel }: ProcessingViewProps) {
 
         {/* Cancel button */}
         <button
+          type="button"
           onClick={onCancel}
           className="px-6 py-2.5 rounded-lg border border-gray-300 text-gray-600 hover:bg-gray-100 hover:text-gray-900 transition-colors text-sm"
         >

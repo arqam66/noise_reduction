@@ -20,6 +20,18 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Visible, consistent keyboard focus for every interactive control. */
+:focus-visible {
+  outline: 2px solid #4f46e5;
+  outline-offset: 2px;
+}
+
+/* Mouse users should not see the focus ring on click. */
+button:focus:not(:focus-visible),
+[role="button"]:focus:not(:focus-visible) {
+  outline: none;
+}
+
 .drop-zone-active {
   border-color: #6366f1 !important;
   background-color: rgba(99, 102, 241, 0.1) !important;
@@ -32,4 +44,19 @@ body {
 
 .animate-pulse-progress {
   animation: pulse-progress 2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

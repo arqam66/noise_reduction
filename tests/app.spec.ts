@@ -11,7 +11,7 @@ test.describe('NoiseGone Web App UI', () => {
     await expect(page.locator('h1')).toContainText('NoiseGone');
     
     // Check upload zone exists
-    await expect(page.locator('text=Drag & drop a video file')).toBeVisible();
+    await expect(page.locator('text=Drag & drop a video or audio file')).toBeVisible();
     await expect(page.locator('text=browse files')).toBeVisible();
   });
 
