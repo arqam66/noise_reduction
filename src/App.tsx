@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import type { AppStage, VideoFile, PresetId, ProcessingProgress, ProcessingResult, AdvancedSettings } from './types'
 import { Header } from './components/Header'
 import { UploadZone } from './components/UploadZone'
@@ -17,7 +17,9 @@ export default function App() {
   const [progress, setProgress] = useState<ProcessingProgress>({ percent: 0, phase: '', eta: null })
   const [result, setResult] = useState<ProcessingResult | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [processingAborted, setProcessingAborted] = useState(false)
+  // Abort flag lives in a ref so an in-flight processVideo call observes a
+  // cancel immediately instead of reading a stale state closure.
+  const processingAbortedRef = useRef(false)
 
   const handleFile = useCallback(async (file: File) => {
     setError(null)
@@ -81,7 +83,7 @@ export default function App() {
   const handleProcess = useCallback(async () => {
     if (!videoFile) return
 
-    setProcessingAborted(false)
+    processingAbortedRef.current = false
     setStage('processing')
     setProgress({ percent: 0, phase: 'Starting...', eta: null })
 
@@ -95,25 +97,26 @@ export default function App() {
         enableVisual,
         advancedSettings,
         (p) => {
-          if (!processingAborted) {
+          if (!processingAbortedRef.current) {
             setProgress(p)
           }
         }
       )
 
-      if (processingAborted) {
-        URL.revokeObjectURL(URL.createObjectURL(new Blob()))
+      if (processingAbortedRef.current) {
         setStage('configuring')
         return
       }
 
       const blobUrl = URL.createObjectURL(outputBlob)
+      const originalBlobUrl = URL.createObjectURL(videoFile.file)
       const processingTimeMs = performance.now() - startTime
 
       setResult({
         originalSize: videoFile.size,
         processedSize: outputBlob.size,
         blobUrl,
+        originalBlobUrl,
         fileName,
         processingTimeMs,
       })
@@ -123,10 +126,10 @@ export default function App() {
       setError(message)
       setStage('configuring')
     }
-  }, [videoFile, selectedPreset, enableVisual, advancedSettings, processingAborted])
+  }, [videoFile, selectedPreset, enableVisual, advancedSettings])
 
   const handleCancel = useCallback(() => {
-    setProcessingAborted(true)
+    processingAbortedRef.current = true
     setStage('configuring')
     setProgress({ percent: 0, phase: '', eta: null })
   }, [])
@@ -134,6 +137,9 @@ export default function App() {
   const handleReset = useCallback(() => {
     if (result?.blobUrl) {
       URL.revokeObjectURL(result.blobUrl)
+    }
+    if (result?.originalBlobUrl) {
+      URL.revokeObjectURL(result.originalBlobUrl)
     }
     if (videoFile?.thumbnailUrl) {
       URL.revokeObjectURL(videoFile.thumbnailUrl)

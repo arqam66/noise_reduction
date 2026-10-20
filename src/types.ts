@@ -32,6 +32,7 @@ export interface ProcessingResult {
   originalSize: number
   processedSize: number
   blobUrl: string
+  originalBlobUrl: string
   fileName: string
   processingTimeMs: number
 }

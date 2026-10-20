@@ -170,28 +170,4 @@ function getExtension(name: string): string {
   return idx >= 0 ? name.slice(idx) : '.mp4'
 }
 
-function estimateRemaining(progress: number, _currentTime: number): string | null {
-  if (progress <= 0) return null
-  return null
-}
 
-export async function probeFile(file: File): Promise<{
-  duration: number | null
-  resolution: string | null
-  codec: string | null
-}> {
-  try {
-    const ff = await loadFFmpeg()
-    const name = 'probe' + getExtension(file.name)
-    const data = await fetchFile(file)
-    await ff.writeFile(name, data)
-
-    // Use ffprobe-style output by running with -hide_banner
-    const output = await ff.exec(['-i', name, '-f', 'null', '-'])
-    // Cleanup
-    try { await ff.deleteFile(name) } catch { /* ignore */ }
-    return { duration: null, resolution: null, codec: null }
-  } catch {
-    return { duration: null, resolution: null, codec: null }
-  }
-}

@@ -58,12 +58,16 @@ export function ResultView({ result, onReset }: ResultViewProps) {
     if (result.blobUrl) {
       processedWs.load(result.blobUrl)
     }
+    if (result.originalBlobUrl) {
+      // Best-effort: the original container may not be decodable by Web Audio.
+      originalWs.load(result.originalBlobUrl).catch(() => {})
+    }
 
     return () => {
       originalWs.destroy()
       processedWs.destroy()
     }
-  }, [result.blobUrl])
+  }, [result.blobUrl, result.originalBlobUrl])
 
   const toggleOriginal = () => {
     originalWsRef.current?.playPause()
